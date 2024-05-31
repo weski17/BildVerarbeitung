@@ -130,11 +130,16 @@ def hysteresis(image, low_threshold, high_threshold):
 
 
 
+def normalize_image(image):
+    normalized_image = (image - image.min()) / (image.max() - image.min()) * 255
+    return normalized_image.astype(np.uint8)
 
 
 
 bild_url = "loewe.jpeg"
 image_gray = cv.imread(bild_url, cv.IMREAD_GRAYSCALE)
+if not image_gray:
+    exit(1)
 binomial_filter1 = binomial_filter()
 filterd_bild = apply_binomial_filter(image_gray, binomial_filter1)
 sobel_bild = apply_sobel_filter_simple(filterd_bild)
@@ -142,12 +147,12 @@ sobel_bild = apply_sobel_filter_simple(filterd_bild)
 gradient_magnitude, gradient_direction = sobel_bild
 non_max_suppressed = non_max_suppression(gradient_magnitude, gradient_direction)
 hysteresis_bild = hysteresis(non_max_suppressed, 100, 200)
+normalize_image = normalize_image(gradient_direction)
 
 
 
 
 
-
-cv.imshow('hysteresis_bild', hysteresis_bild)
+cv.imshow('hysteresis_bild', normalize_image)
 cv.waitKey(0)  # Warten auf Tastendruck
 cv.destroyAllWindows()  # Schließen aller geöffneten Fenster
