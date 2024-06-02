@@ -1,6 +1,6 @@
 import cv2 as cv
 import numpy as np
-
+import math
 def prepare_image(image_path):
     """
     Prepares an image for circle detection by converting it to grayscale and applying the Canny edge detector.
@@ -20,6 +20,31 @@ def prepare_image(image_path):
     edges = cv.Canny(image, threshold1=100, threshold2=200)  # Benutzung für schnelles Testing
     return edges, original_image
 
+def deg_to_rad(degrees):
+    """Konvertiert Grad in Radiant."""
+    return degrees * math.pi / 180
+
+def taylor_sin(x, n=5):
+    """Berechnet Sinus mit Hilfe der Taylor-Reihe."""
+    result = 0
+    sign = 1
+    for i in range(1, n*2, 2):
+        term = sign * (x**i) / math.factorial(i)
+        result += term
+        sign *= -1
+    return result
+
+def taylor_cos(x, n=5):
+    """Berechnet Cosinus mit Hilfe der Taylor-Reihe."""
+    result = 1
+    sign = -1
+    for i in range(2, n*2, 2):
+        term = sign * (x**i) / math.factorial(i)
+        result += term
+        sign *= -1
+    return result
+
+
 def HoughCircles(I, min_radius, max_radius):
     # Bild in Graustufen umwandeln, falls es nicht bereits in Graustufen ist
     if len(I.shape) == 3:
@@ -37,13 +62,15 @@ def HoughCircles(I, min_radius, max_radius):
     # Durchlaufe alle Bildkoordinaten
     for u in range(rows):
         for v in range(cols):
-            if edges[u, v] > 0:  # Kantenpunkt
-                for r in range(min_radius, max_radius + 1): # alle mögliche Radien
-                    for theta in range(0, 360, 20): # Winkel Iteration in 20 Grad Schritten
-                        a = int(u - r * np.cos(np.deg2rad(theta))) # X -Mittlepunkt
-                        b = int(v - r * np.sin(np.deg2rad(theta))) # Y -Mittelpunkt
+            if edges[u, v] > 0:  # Edge pixel
+                for r in range(min_radius, max_radius + 1):  # All possible radii
+                    for theta_deg in range(0, 360, 20):  # Angle iteration in 20-degree steps
+                        theta_rad = deg_to_rad(theta_deg)  # Convert degree to radian
+                        a = int(u - r * taylor_cos(theta_rad))  # X-center
+                        b = int(v - r * taylor_sin(theta_rad))  # Y-center
                         if 0 <= a < rows and 0 <= b < cols:
                             Acc[a, b, r - min_radius] += 1
+
 
     # Finde die maximalen Kreise im Akkumulator-Array
     MaxCircles = []
@@ -70,7 +97,7 @@ def visualize_circles(original_image, circles):
     cv.waitKey(0)
     cv.destroyAllWindows()
 
-# Beispielverwendung
+
 if __name__ == "__main__":
     edge_image, original_image = prepare_image("loewe.jpeg")
     if edge_image is None or original_image is None:

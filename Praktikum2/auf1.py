@@ -111,20 +111,22 @@ def hysteresis(image, low_threshold, high_threshold):
     for i in range(rows):
         for j in range(cols):
             if image[i, j] >= high_threshold:
-                output[i, j] = strong
+                output[i, j] = strong # Starkes Kantenpixel
             elif image[i, j] >= low_threshold:
-                output[i, j] = weak
+                output[i, j] = weak # Schwaches Kantenpixel
 
+    #  Verbinden schwache Kanten mit starken Kanten
     for i in range(1, rows - 1):
         for j in range(1, cols - 1):
             if output[i, j] == weak:
+                # Überprüfen die 8-Nachbarschaft des aktuellen Pixels
                 if ((output[i + 1, j - 1] == strong) or (output[i + 1, j] == strong) or (output[i + 1, j + 1] == strong)
                         or (output[i, j - 1] == strong) or (output[i, j + 1] == strong)
                         or (output[i - 1, j - 1] == strong) or (output[i - 1, j] == strong) or (
                                 output[i - 1, j + 1] == strong)):
-                    output[i, j] = strong
+                    output[i, j] = strong # Schwaches Kantenpixel wird zu starkem Kantenpixel
                 else:
-                    output[i, j] = 0
+                    output[i, j] = 0     # Schwaches Kantenpixel wird unterdrückt
 
     return output
 
@@ -154,5 +156,5 @@ normalize_image = normalize_image(gradient_direction)
 
 
 cv.imshow('hysteresis_bild', normalize_image)
-cv.waitKey(0)  # Warten auf Tastendruck
-cv.destroyAllWindows()  # Schließen aller geöffneten Fenster
+cv.waitKey(0) 
+cv.destroyAllWindows()  
