@@ -1,8 +1,6 @@
 import cv2 as cv
 import numpy as np
-from matplotlib import pyplot as plt
-
-
+import math
 def binomial_filter():
     coefficients = np.array([1, 4, 6, 4, 1])
     kernel = np.zeros((5, 5))
@@ -31,7 +29,7 @@ def apply_binomial_filter(image, kernel):
     return filtered_image
 
 
-def apply_sobel_filter_simple(image):
+def apply_sobel_filter(image):
     # Definition der Sobel-Kernmatrizen für X- und Y-Richtung
     Gx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
     Gy = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
@@ -63,11 +61,12 @@ def apply_sobel_filter_simple(image):
         for j in range(cols):
             # Berechnen des Winkels mit arctan2 für jedes Element
             gradient_direction[i, j] = np.arctan2(sobel_y[i, j], sobel_x[i, j])
-
-    normalized_image = cv.normalize(gradient_direction, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
-    
     return gradient_magnitude, gradient_direction
 
+def convert_to_degrees_and_limit(angle_rad):
+     angle_deg = angle_rad * (180 / math.pi)
+     current_angle = angle_deg % 180
+     return current_angle
 
 def non_max_suppression(gradient_magnitude, gradient_direction):
     rows, cols = gradient_magnitude.shape
@@ -75,8 +74,7 @@ def non_max_suppression(gradient_magnitude, gradient_direction):
 
     for i in range(1, rows - 1):
         for j in range(1, cols - 1):
-            current_angle = np.degrees(gradient_direction[i, j]) % 180
-
+            current_angle = convert_to_degrees_and_limit(gradient_direction[i, j])
             q = 255
             r = 255
 
@@ -106,7 +104,7 @@ def hysteresis(image, low_threshold, high_threshold):
     output = np.zeros_like(image)
 
     strong = 255
-    weak = 100
+    weak = 0
 
     for i in range(rows):
         for j in range(cols):
@@ -127,7 +125,6 @@ def hysteresis(image, low_threshold, high_threshold):
                     output[i, j] = strong # Schwaches Kantenpixel wird zu starkem Kantenpixel
                 else:
                     output[i, j] = 0     # Schwaches Kantenpixel wird unterdrückt
-
     return output
 
 
@@ -137,24 +134,17 @@ def normalize_image(image):
     return normalized_image.astype(np.uint8)
 
 
+if __name__ == "__main__":
+    bild_url = "loewe.jpeg"
+    image_gray = cv.imread(bild_url, cv.IMREAD_GRAYSCALE)
+    binomial_filter1 = binomial_filter()
+    filterd_bild = apply_binomial_filter(image_gray, binomial_filter1)
+    sobel_bild = apply_sobel_filter(filterd_bild)
 
-bild_url = "loewe.jpeg"
-image_gray = cv.imread(bild_url, cv.IMREAD_GRAYSCALE)
-if not image_gray:
-    exit(1)
-binomial_filter1 = binomial_filter()
-filterd_bild = apply_binomial_filter(image_gray, binomial_filter1)
-sobel_bild = apply_sobel_filter_simple(filterd_bild)
-
-gradient_magnitude, gradient_direction = sobel_bild
-non_max_suppressed = non_max_suppression(gradient_magnitude, gradient_direction)
-hysteresis_bild = hysteresis(non_max_suppressed, 100, 200)
-normalize_image = normalize_image(gradient_direction)
-
-
-
-
-
-cv.imshow('hysteresis_bild', normalize_image)
-cv.waitKey(0) 
-cv.destroyAllWindows()  
+    gradient_magnitude, gradient_direction = sobel_bild
+    non_max_suppressed = non_max_suppression(gradient_magnitude, gradient_direction)
+    hysteresis_bild = hysteresis(non_max_suppressed, 100, 200)
+    normalize_image = normalize_image(gradient_direction)
+    cv.imshow('hysteresis_bild', hysteresis_bild)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
