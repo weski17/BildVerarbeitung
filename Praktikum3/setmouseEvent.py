@@ -44,6 +44,20 @@ def regionGrowing(image_gray, seedPoint, localThreshold, maxNumOfPixelThreshold)
 
 
 def mouseEvent(event, x, y, flags, param):
+    """
+    Handles mouse events for the OpenCV window.
+
+    Args:
+        event: The type of the mouse event (e.g., cv.EVENT_LBUTTONDOWN).
+        x (int): The x-coordinate of the mouse event.
+        y (int): The y-coordinate of the mouse event.
+        flags: Any relevant flags passed by OpenCV (not used here).
+        param: Additional parameters passed to the callback function (not used here).
+
+    If the left mouse button is clicked, the function starts the region growing process from the clicked point.
+    It applies a Gaussian blur to the grayscale image, detects edges using the Canny method, and then
+    performs region growing segmentation. The result is displayed in a new window.
+    """
     global image_gray
     if event == cv.EVENT_LBUTTONDOWN:
         seedPoint = [y, x]
@@ -65,7 +79,7 @@ image_gray = cv.imread('hand.jpeg', cv.IMREAD_GRAYSCALE)
 
 # Fenster erstellen und Mausereignisse verknüpfen
 cv.namedWindow('image')
-cv.setMouseCallback('image', mouseEvent)
+cv.setMouseCallback('image', mouseEvent, image_gray)
 
 # Bild anzeigen
 cv.imshow('image', image)
