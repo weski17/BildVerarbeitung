@@ -1,3 +1,6 @@
+# Autor : Wael Eskeif
+# Datum : 12.06.2024
+
 import cv2 as cv
 import numpy as np
 
