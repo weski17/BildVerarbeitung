@@ -1,5 +1,5 @@
-# Autor : Wael Eskeif
-# Datum : 12.06.2024
+# Autor: Wael Eskeif
+# Datum: 12.06.2024
 
 import cv2 as cv
 import numpy as np
@@ -19,7 +19,6 @@ def regionGrowing(image_gray, seedPoint, localThreshold, maxNumOfPixelThreshold)
     Returns:
         segmented: A binary image where segmented pixels are marked with 255 (white) and others with 0 (black).
     """
-
     rows, cols = image_gray.shape
     segmented = np.zeros_like(image_gray)
     seed_grey_value = image_gray[seedPoint[0], seedPoint[1]]
@@ -33,7 +32,7 @@ def regionGrowing(image_gray, seedPoint, localThreshold, maxNumOfPixelThreshold)
 
         # Überprüfe benachbarte Pixel
         for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-            nx, ny = x + dx, y + dy # Position of the neighboring pixel
+            nx, ny = x + dx, y + dy  # Position of the neighboring pixel
 
             # Check if the neighboring pixel is within the image boundaries and not yet segmented
             if 0 <= nx < rows and 0 <= ny < cols and segmented[nx, ny] == 0:
@@ -44,7 +43,6 @@ def regionGrowing(image_gray, seedPoint, localThreshold, maxNumOfPixelThreshold)
                     numSegmentedPixels += 1
 
     return segmented
-
 
 def mouseEvent(event, x, y, flags, param):
     """
@@ -65,91 +63,24 @@ def mouseEvent(event, x, y, flags, param):
     if event == cv.EVENT_LBUTTONDOWN:
         seedPoint = [y, x]
 
-        filterd_image = cv.GaussianBlur(image_gray, (5, 5), 0)
-        canny_image = cv.Canny(filterd_image, 100, 250)
-
         localThreshold = 70
-        maxNumOfPixelThreshold = 90000
+        maxNumOfPixelThreshold = 100000
         segmented_image = regionGrowing(image_gray, seedPoint, localThreshold, maxNumOfPixelThreshold)
 
-        struct_element = np.ones((5, 5), np.uint8)
+        struct_element = np.ones((3, 3), np.uint8)
 
         closed_image = close_image(segmented_image, struct_element)
-        skeleton_image = skeletonize(closed_image)
 
-        cv.imshow('Segmented Image', skeleton_image)
+        eroded_image = erode(closed_image, struct_element)
+        edges_image = subtract(closed_image, eroded_image)
+
+        cv.imshow('Segmented Image', segmented_image)
+        cv.imshow('Closed Image', closed_image)
+        cv.imshow('Edges Image', edges_image)
         cv.waitKey(0)
         cv.destroyAllWindows()
 
-
-def skeletonize(binary_image):
-    """
-    Skeletonization of a binary image.
-
-    Args:
-        binary_image: The binary input image.
-
-    Returns:
-        binary_image: The skeletonized binary image.
-    """
-    while True:
-        # Step 1: Mark all pixels that can be deleted
-        to_delete = []
-        for i in range(1, binary_image.shape[0] - 1):
-            for j in range(1, binary_image.shape[1] - 1):
-                if binary_image[i, j] == 1:
-                    # Extract the 8-neighborhood of the current pixel
-                    neighbors = binary_image[i - 1:i + 2, j - 1:j + 2].ravel()
-                    # Calculate the number of foreground neighbors
-                    foreground_neighbors = sum(neighbors)
-                    if foreground_neighbors >= 2 and foreground_neighbors <= 6:
-                        transitions = 0
-                        # Count transitions from background to foreground
-                        for k in range(len(neighbors) - 1):
-                            if neighbors[k] == 0 and neighbors[k + 1] == 1:
-                                transitions += 1
-                        # Condition for deleting the pixel
-                        if transitions == 1:
-                            if neighbors[0] * neighbors[2] * neighbors[4] == 0 and neighbors[2] * neighbors[4] * \
-                                    neighbors[6] == 0:
-                                to_delete.append((i, j))
-
-        # Step 2: Delete marked pixels
-        for pixel in to_delete:
-            binary_image[pixel[0], pixel[1]] = 0
-
-        # Step 3: Mark all pixels that can be deleted (in reverse direction)
-        to_delete = []
-        for i in range(1, binary_image.shape[0] - 1):
-            for j in range(1, binary_image.shape[1] - 1):
-                if binary_image[i, j] == 1:
-                    # Extract the 8-neighborhood of the current pixel
-                    neighbors = binary_image[i - 1:i + 2, j - 1:j + 2].ravel()
-                    # Calculate the number of foreground neighbors
-                    foreground_neighbors = sum(neighbors)
-                    if foreground_neighbors >= 2 and foreground_neighbors <= 6:
-                        transitions = 0
-                        # Count transitions from background to foreground
-                        for k in range(len(neighbors) - 1):
-                            if neighbors[k] == 0 and neighbors[k + 1] == 1:
-                                transitions += 1
-                        # Condition for deleting the pixel
-                        if transitions == 1:
-                            if neighbors[0] * neighbors[2] * neighbors[6] == 0 and neighbors[0] * neighbors[4] * \
-                                    neighbors[6] == 0:
-                                to_delete.append((i, j))
-
-        # Step 4: Delete marked pixels (in reverse direction)
-        for pixel in to_delete:
-            binary_image[pixel[0], pixel[1]] = 0
-
-        # Check if no more changes were made
-        if len(to_delete) == 0:
-            break
-
-    return binary_image
-
-def dilatation (binary_image, struct_element):
+def dilate(binary_image, struct_element):
     """
     Perform dilation on a binary image using the given structuring element.
 
@@ -180,7 +111,6 @@ def dilatation (binary_image, struct_element):
                                 output_image[x, y] = 255
 
     return output_image
-
 
 def erode(binary_image, struct_element):
     """
@@ -232,9 +162,29 @@ def close_image(binary_image, struct_element):
     Returns:
         closed: The binary image after closing.
     """
-    dilated = dilatation(binary_image, struct_element)
+    dilated = dilate(binary_image, struct_element)
     closed = erode(dilated, struct_element)
     return closed
+
+def subtract(image1, image2):
+    """
+    subtracts image2 from image1.
+
+    Args:
+        image1 (numpy.ndarray): The first input image.
+        image2 (numpy.ndarray): The second input image to be subtracted from the first.
+
+    Returns:
+        output_image: The result of the subtraction.
+    """
+    output_image = np.zeros_like(image1)
+    rows, cols = image1.shape
+
+    for i in range(rows):
+        for j in range(cols):
+            output_image[i, j] = max(image1[i, j] - image2[i, j], 0)
+
+    return output_image
 
 if __name__ == "__main__":
     image = cv.imread('hand.jpeg')
