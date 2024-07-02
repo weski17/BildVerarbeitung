@@ -1,152 +1,75 @@
-# Autor: Wael Eskeif
-# Datum: 12.06.2024
-
 import cv2 as cv
 import numpy as np
 
-image_gray = None
 def regionGrowing(image_gray, seedPoint, localThreshold, maxNumOfPixelThreshold):
     """
     Performs region growing segmentation on a grayscale image.
-
-    Args:
-        image_gray (numpy.ndarray): The grayscale image on which the algorithm will be applied.
-        seedPoint (tuple): The starting point (x, y) for region growing.
-        localThreshold (int): The threshold for pixel similarity (homogeneity). Neighboring pixels are included
-                              in the region if their intensity difference with the seed pixel is less than this value.
-        maxNumOfPixelThreshold (int): The maximum number of pixels to include in the segmented region.
-
-    Returns:
-        segmented: A binary image where segmented pixels are marked with 255 (white) and others with 0 (black).
     """
     rows, cols = image_gray.shape
-    segmented = np.zeros_like(image_gray)
+    segmented = np.zeros_like(image_gray, dtype=np.uint8)
     seed_grey_value = image_gray[seedPoint[0], seedPoint[1]]
-
     queue = [seedPoint]
-    numSegmentedPixels = 1
+    numSegmentedPixels = 0
 
     while queue and numSegmentedPixels < maxNumOfPixelThreshold:
         x, y = queue.pop(0)
-        segmented[x, y] = 255  # Mark the pixel as segmented
+        if segmented[x, y] == 0:  # Check if the pixel has not already been segmented
+            segmented[x, y] = 255
+            numSegmentedPixels += 1
 
-        # Überprüfe benachbarte Pixel
-        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-            nx, ny = x + dx, y + dy  # Position of the neighboring pixel
-
-            # Check if the neighboring pixel is within the image boundaries and not yet segmented
-            if 0 <= nx < rows and 0 <= ny < cols and segmented[nx, ny] == 0:
-                # Check the homogeneity criterion
-                if abs(int(image_gray[nx, ny]) - int(seed_grey_value)) < localThreshold:
-                    segmented[nx, ny] = 255  # Pixel als segmentiert markieren
-                    queue.append((nx, ny))
-                    numSegmentedPixels += 1
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < rows and 0 <= ny < cols and segmented[nx, ny] == 0:
+                    if abs(int(image_gray[nx, ny]) - seed_grey_value) < localThreshold:
+                        queue.append((nx, ny))
 
     return segmented
-
-def mouseEvent(event, x, y, flags, param):
-    """
-    Handles mouse events for the OpenCV window.
-
-    Args:
-        event: The type of the mouse event (e.g., cv.EVENT_LBUTTONDOWN).
-        x (int): The x-coordinate of the mouse event.
-        y (int): The y-coordinate of the mouse event.
-        flags: Any relevant flags passed by OpenCV (not used here).
-        param: Additional parameters passed to the callback function (not used here).
-
-    If the left mouse button is clicked, the function starts the region growing process from the clicked point.
-    It applies a Gaussian blur to the grayscale image, detects edges using the Canny method, and then
-    performs region growing segmentation. The result is displayed in a new window.
-    """
-    global image_gray
-    if event == cv.EVENT_LBUTTONDOWN:
-        seedPoint = [y, x]
-
-        localThreshold = 70
-        maxNumOfPixelThreshold = 100000
-        segmented_image = regionGrowing(image_gray, seedPoint, localThreshold, maxNumOfPixelThreshold)
-
-        struct_element = np.ones((3, 3), np.uint8)
-
-        closed_image = close_image(segmented_image, struct_element)
-
-        eroded_image = erode(closed_image, struct_element)
-        edges_image = subtract(closed_image, eroded_image)
-
-        cv.imshow('Segmented Image', segmented_image)
-        cv.imshow('Closed Image', closed_image)
-        cv.imshow('Edges Image', edges_image)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
 
 def dilate(binary_image, struct_element):
     """
     Perform dilation on a binary image using the given structuring element.
-
-    Args:
-        binary_image: The input binary image (values 0 or 255).
-        struct_element: The structuring element for dilation.
-
-    Returns:
-        output_image: The dilated binary image.
     """
     rows, cols = binary_image.shape
-    struct_rows, struct_cols = struct_element.shape
-    struct_x = struct_rows // 2
-    struct_y = struct_cols // 2
     output_image = np.zeros_like(binary_image)
+    k, l = struct_element.shape
+    k2, l2 = k // 2, l // 2
 
     for i in range(rows):
         for j in range(cols):
-            if binary_image[i, j] == 255:
-                for m in range(struct_rows):
-                    for n in range(struct_cols):
-                        if struct_element[m, n] == 1:
-                            # Calculate the corresponding position in the output image
-                            x = i + m - struct_x
-                            y = j + n - struct_y
-                            if 0 <= x < rows and 0 <= y < cols:
-                                # Set the corresponding pixel in the output image to foreground (white)
-                                output_image[x, y] = 255
+            max_value = 0
+            for di in range(-k2, k2 + 1):
+                for dj in range(-l2, l2 + 1):
+                    ni, nj = i + di, j + dj
+                    if 0 <= ni < rows and 0 <= nj < cols:
+                        if struct_element[di + k2, dj + l2]:
+                            max_value = max(max_value, binary_image[ni, nj])
+            output_image[i, j] = max_value
 
     return output_image
 
 def erode(binary_image, struct_element):
     """
     Perform erosion on a binary image using the given structuring element.
-
-    Args:
-        binary_image (numpy.ndarray): The input binary image (values 0 or 255).
-        struct_element (numpy.ndarray): The structuring element for erosion.
-
-    Returns:
-        output_image: The eroded binary image.
     """
     rows, cols = binary_image.shape
-    struct_rows, struct_cols = struct_element.shape
-    struct_x = struct_rows // 2
-    struct_y = struct_cols // 2
-
     output_image = np.zeros_like(binary_image)
+    k, l = struct_element.shape
+    k2, l2 = k // 2, l // 2
 
     for i in range(rows):
         for j in range(cols):
-            match = True
-            for m in range(struct_rows):
-                for n in range(struct_cols):
-                    # Check if the structuring element at this position is 1
-                    if struct_element[m, n] == 1:
-                        x = i + m - struct_x
-                        y = j + n - struct_y
-                        # Check if the resulting coordinate is within the image bounds
-                        if x < 0 or x >= rows or y < 0 or y >= cols or binary_image[x, y] != 255:
-                            match = False
+            min_value = 255
+            all_ones = True
+            for di in range(-k2, k2 + 1):
+                for dj in range(-l2, l2 + 1):
+                    ni, nj = i + di, j + dj
+                    if 0 <= ni < rows and 0 <= nj < cols:
+                        if struct_element[di + k2, dj + l2] and binary_image[ni, nj] == 0:
+                            all_ones = False
                             break
-                if not match:
+                if not all_ones:
                     break
-            # If all pixels in the structuring element match and are within bounds, set the output pixel to 255
-            if match:
+            if all_ones:
                 output_image[i, j] = 255
 
     return output_image
@@ -154,45 +77,51 @@ def erode(binary_image, struct_element):
 def close_image(binary_image, struct_element):
     """
     Perform morphological closing on a binary image.
-
-    Args:
-        binary_image: The input binary image (values 0 or 255).
-        struct_element: The structuring element for closing.
-
-    Returns:
-        closed: The binary image after closing.
     """
     dilated = dilate(binary_image, struct_element)
     closed = erode(dilated, struct_element)
     return closed
 
-def subtract(image1, image2):
+def skeletonize(binary_image):
     """
-    subtracts image2 from image1.
-
-    Args:
-        image1 (numpy.ndarray): The first input image.
-        image2 (numpy.ndarray): The second input image to be subtracted from the first.
-
-    Returns:
-        output_image: The result of the subtraction.
+    Skeletonize the binary image to a one-pixel wide structure using morphological operations.
     """
-    output_image = np.zeros_like(image1)
-    rows, cols = image1.shape
+    skel = np.zeros_like(binary_image)
+    img = binary_image.copy()
+    element = cv.getStructuringElement(cv.MORPH_CROSS, (3, 3))
 
-    for i in range(rows):
-        for j in range(cols):
-            output_image[i, j] = max(image1[i, j] - image2[i, j], 0)
+    while True:
+        eroded = cv.erode(img, element)
+        temp = cv.dilate(eroded, element)
+        temp = img - temp
+        skel = skel | temp
+        img = eroded
+        if cv.countNonZero(img) == 0:
+            break
 
-    return output_image
+    return skel
+
+def mouseEvent(event, x, y, flags, param):
+    global image_gray
+    if event == cv.EVENT_LBUTTONDOWN:
+        segmented_image = regionGrowing(image_gray, (y, x), 70, 100000)
+        struct_element = np.ones((3, 3), np.uint8)
+        closed_image = close_image(segmented_image, struct_element)
+        skeletonized_image = skeletonize(closed_image)
+
+        cv.imshow('Segmented Image', segmented_image)
+        cv.imshow('Closed Image', closed_image)
+        cv.imshow('Skeletonized Image', skeletonized_image)
 
 if __name__ == "__main__":
     image = cv.imread('hand.jpeg')
+    if image is None:
+        print("Error loading image.")
+        exit()
     image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
     cv.namedWindow('image')
     cv.setMouseCallback('image', mouseEvent)
-
-    cv.imshow('image', image)
+    cv.imshow('image', image_gray)
     cv.waitKey(0)
     cv.destroyAllWindows()
